@@ -1,5 +1,5 @@
-from collections import Counter
 import itertools
+from collections import Counter
 
 
 class Op:
@@ -51,7 +51,11 @@ class ThoughtObject:
             return f"{self.op}({repr(self.params[0])})"
 
     def __eq__(self, other):
-        return isinstance(other, ThoughtObject) and self.op == other.op and self._set_params == other._set_params
+        return (
+            isinstance(other, ThoughtObject)
+            and self.op == other.op
+            and self._set_params == other._set_params
+        )
 
     def __hash__(self):
         return hash((self.op, self._set_params))
@@ -117,7 +121,9 @@ class ThoughtObject:
             return self * self * self
         if power == 0.5:
             return TransformObject(Op.ROOT, self)
-        return OrderedAggrObject(Op.POW, self, power)
+        raise ValueError(
+            "The module currently does not support power operation except for (0.5, 1, 2, 3)."
+        )
 
     def __rpow__(self, other):
         if not isinstance(other, ThoughtObject):
@@ -261,46 +267,11 @@ class AggregateObject(ThoughtObject):
         return self._children
 
 
-class OrderedAggrObject(ThoughtObject):
-    OPS = (Op.POW,)
-
-    def __init__(self, op, param1, param2):
-        if not isinstance(param1, ThoughtObject):
-            param1 = ConstObject(param1) if param1 > 0 else -ConstObject(-param1)
-        if not isinstance(param2, ThoughtObject):
-            param2 = ConstObject(param2) if param2 > 0 else -ConstObject(-param2)
-        self._depth = max(param1.depth, param2.depth) + 1
-        super().__init__(op, param1, param2)
-        p1 = param1.expr if param1.op in (Op.NUM, Op.CON) else f"( {param1.expr} )"
-        p2 = (
-            param2.value
-            if param2.op == Op.CON and param2.value in (2, 3)
-            else param2.expr
-            if param2.op in (Op.NUM, Op.CON)
-            else f"( {param2.expr} )"
-        )
-        if op == Op.POW:
-            self.expr = f"{p1} ** {p2}"
-            self.sub_op = ()
-        self.values = param1.values | param2.values
-
-    def __eq__(self, other):
-        return isinstance(other, ThoughtObject) and self.op == other.op and self.params == other.params
-
-    def __hash__(self):
-        return hash((self.op, *self.params))
-
-    @property
-    def depth(self):
-        return self._depth
-
-
 class ThoughtExpander:
-    def __init__(self, initial_thoughts, limit_depth, limit_thoughts=0, power=False):
+    def __init__(self, initial_thoughts, limit_depth, limit_thoughts=0):
         self.initial_thoughts = initial_thoughts
         self.limit_depth = limit_depth
         self.limit_thoughts = limit_thoughts
-        self.power = power
 
     def __iter__(self):
         self.depth = 0
@@ -340,7 +311,10 @@ class ThoughtExpander:
                 if (thought := TransformObject(op, e)) not in self.thoughts:
                     expanded_thoughts.append(thought)
                     expanded_indices.append((op, i))
-                    if self.limit_thoughts and len(self.thoughts) + len(expanded_thoughts) > self.limit_thoughts:
+                    if (
+                        self.limit_thoughts
+                        and len(self.thoughts) + len(expanded_thoughts) > self.limit_thoughts
+                    ):
                         return expanded_thoughts, expanded_indices
         return expanded_thoughts, expanded_indices
 
@@ -356,40 +330,19 @@ class ThoughtExpander:
                     for i, e1 in enumerate(existing_thoughts)
                     for j, e2 in enumerate(new_thoughts, self.n_aggregated)
                 ),
-                itertools.combinations_with_replacement(enumerate(new_thoughts, self.n_aggregated), 2),
+                itertools.combinations_with_replacement(
+                    enumerate(new_thoughts, self.n_aggregated), 2
+                ),
             ):
-                if (thought := AggregateObject(op, e1, e2)) not in self.thoughts and thought not in expanded_thoughts:
+                if (
+                    thought := AggregateObject(op, e1, e2)
+                ) not in self.thoughts and thought not in expanded_thoughts:
                     expanded_thoughts.append(thought)
                     expanded_indices.append((op, (i, j)))
-                    if self.limit_thoughts and len(self.thoughts) + len(expanded_thoughts) > self.limit_thoughts:
+                    if (
+                        self.limit_thoughts
+                        and len(self.thoughts) + len(expanded_thoughts) > self.limit_thoughts
+                    ):
                         return expanded_thoughts, expanded_indices
-
-        if not self.power:
-            return expanded_thoughts, expanded_indices
-
-        for op in OrderedAggrObject.OPS:
-            for i, e1 in enumerate(existing_thoughts):
-                for j, e2 in enumerate(new_thoughts, self.n_aggregated):
-                    if (
-                        thought := OrderedAggrObject(op, e1, e2)
-                    ) not in self.thoughts and thought not in expanded_thoughts:
-                        expanded_thoughts.append(thought)
-                        expanded_indices.append((op, (i, j)))
-                    if (
-                        thought := OrderedAggrObject(op, e2, e1)
-                    ) not in self.thoughts and thought not in expanded_thoughts:
-                        expanded_thoughts.append(thought)
-                        expanded_indices.append((op, (j, i)))
-                    if self.limit_thoughts and len(self.thoughts) + len(expanded_thoughts) > self.limit_thoughts:
-                        return expanded_thoughts, expanded_indices
-            for i, e1 in enumerate(new_thoughts, self.n_aggregated):
-                for j, e2 in enumerate(new_thoughts, self.n_aggregated):
-                    if (
-                        thought := OrderedAggrObject(op, e1, e2)
-                    ) not in self.n_aggregated and thought not in expanded_thoughts:
-                        expanded_thoughts.append(thought)
-                        expanded_indices.append((op, (i, j)))
-                        if self.limit_thoughts and len(self.thoughts) + len(expanded_thoughts) > self.limit_thoughts:
-                            return expanded_thoughts, expanded_indices
 
         return expanded_thoughts, expanded_indices

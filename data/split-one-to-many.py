@@ -1,7 +1,8 @@
+import json
 import os
 import random
+
 import pandas as pd
-import json
 
 
 def vary_questions(
@@ -61,7 +62,9 @@ def vary_questions(
 
             if "json" in filename:
                 with open(path, "w", encoding="utf-8") as file:
-                    json.dump(dataset.to_dict(orient="records"), file, indent=2, ensure_ascii=False)
+                    json.dump(
+                        dataset.to_dict(orient="records"), file, indent=2, ensure_ascii=False
+                    )
             else:
                 dataset.to_csv(path, index=False)
         print()

@@ -1,15 +1,22 @@
 import os
-import yaml
+
 import fire
 import pytorch_lightning as pl
 import pytorch_lightning.loggers
-from models.lit_athena import LitAthena
+import yaml
+
 from callbacks import BestScoreSummary, LogEvaluation
-from dataset import DataModule, load_datasets, is_cv
+from dataset import DataModule, is_cv, load_datasets
+from inspection import inspect_data
+from model import Athena
 
 
-def _train_cv(cv, dataset, fold_start, fold_end, score_filename, node, force_filename, **train_kwargs):
-    score_filename = BestScoreSummary(score_filename, None, None, node=node, force_filename=force_filename).filename
+def _train_cv(
+    cv, dataset, fold_start, fold_end, score_filename, node, force_filename, **train_kwargs
+):
+    score_filename = BestScoreSummary(
+        score_filename, None, None, node=node, force_filename=force_filename
+    ).filename
     for i in range(fold_start, fold_end):
         print(f"Fold {i + 1}/5 Start")
         train(
@@ -75,7 +82,9 @@ def train(
 
     if not os.path.exists(os.path.join(".language-models", language_model)):
         if "/" in language_model:
-            print(f"Download {language_model}. Use language-model={language_model.split('/')[-1]} for further runs.")
+            print(
+                f"Download {language_model}. Use language-model={language_model.split('/')[-1]} for further runs."
+            )
         language_model = download(language_model)
 
     ckpt = not log and ckpt
@@ -97,7 +106,7 @@ def train(
         test_on_validation=test_on_validation,
         num_token=num_token,
     )
-    model = LitAthena(
+    model = Athena(
         language_model=language_model,
         p_drop=p_drop,
         ln_type=ln,
@@ -120,11 +129,6 @@ def train(
         epoch=epoch,
         start_validation_loss=start_validation_loss,
         constants=constants,
-        has_power=has_power,
-        data_path="data",
-        dataset=dataset,
-        batch_size=batch_size,
-        collate_raw=False,
     )
 
     if log:
@@ -147,9 +151,15 @@ def train(
 
         logger = [
             pl.loggers.TensorBoardLogger(
-                log_path, name=model_name, version=train_setting, sub_dir=dataset_name, default_hp_metric=False
+                log_path,
+                name=model_name,
+                version=train_setting,
+                sub_dir=dataset_name,
+                default_hp_metric=False,
             ),
-            pl.loggers.CSVLogger(log_path, name=model_name, version=train_setting + os.sep + dataset_name),
+            pl.loggers.CSVLogger(
+                log_path, name=model_name, version=train_setting + os.sep + dataset_name
+            ),
         ]
         callbacks = [
             pl.callbacks.LearningRateMonitor(),
@@ -172,7 +182,9 @@ def train(
                 ],
                 force_filename=force_filename,
             ),
-            LogEvaluation(filename=f"{model_name}.{dataset_name}", train_setting=train_setting, node=node),
+            LogEvaluation(
+                filename=f"{model_name}.{dataset_name}", train_setting=train_setting, node=node
+            ),
         ]
         if ckpt:
             ckpt_path = logger[0].log_dir.replace(log_path, ckpt_path)
@@ -191,7 +203,11 @@ def train(
         callbacks = []
 
     if swa:
-        callbacks.append(pl.callbacks.StochasticWeightAveraging(swa_epoch_start=epoch - swa if swa >= 1 else 1 - swa))
+        callbacks.append(
+            pl.callbacks.StochasticWeightAveraging(
+                swa_epoch_start=epoch - swa if swa >= 1 else 1 - swa
+            )
+        )
 
     trainer = pl.Trainer(
         max_epochs=epoch,
@@ -216,8 +232,10 @@ def test(model_path, hparam_path, dataset):
     with open(hparam_path, "r") as fp:
         hparams = yaml.load(fp, Loader=yaml.UnsafeLoader)
 
-    model = LitAthena.load_from_checkpoint(model_path, skip_validation=5, lr=None, hparams_file=hparam_path)
-    datasets, constants, has_power = load_datasets(
+    model = Athena.load_from_checkpoint(
+        model_path, skip_validation=5, lr=None, hparams_file=hparam_path
+    )
+    datasets, *_ = load_datasets(
         data_root="data",
         dataset_name=dataset,
         limit_depth=hparams["limit_depth"],
@@ -225,7 +243,10 @@ def test(model_path, hparam_path, dataset):
         ignore_over_depth=True,
     )
     datamodule = DataModule(
-        tokenizer=hparams["language_model"], datasets=datasets, batch_size=32, test_on_validation=False
+        tokenizer=hparams["language_model"],
+        datasets=datasets,
+        batch_size=32,
+        test_on_validation=False,
     )
 
     trainer = pl.Trainer(logger=False, enable_checkpointing=False)
@@ -252,106 +273,29 @@ def test(model_path, hparam_path, dataset):
     print("Final Accuracy : ", acc / n)
 
 
-def inspect_data(
+def inspect(
     dataset="asdiv-a/fold0",
     data_path="data",
     tokenizer="roberta-base",
     compress_num=False,
     limit_depth=19,
-    power=False,
     ignore_over_depth=False,
     multi=False,
 ):
-    datasets, constants, has_power, max_depth = load_datasets(
-        data_path,
-        dataset,
-        limit_depth,
-        compress_num,
-        ignore_over_depth,
+    inspect_data(
+        dataset=dataset,
+        data_path=data_path,
         tokenizer=tokenizer,
+        compress_num=compress_num,
+        limit_depth=limit_depth,
+        ignore_over_depth=ignore_over_depth,
         multi=multi,
-        label=True,
-        power=power,
-    )
-    from collections import Counter
-    from statistics import mean, stdev
-
-    def stderr(data):
-        return stdev(data) / len(data) ** 0.5
-
-    def _print_statistics(name, datas):
-        for mode, data in zip(("(train)", "  (dev)", " (test)", "  (all)"), datas):
-            print(
-                f"{name} {mode} : {max(data)=}",
-                f"{min(data)=}",
-                f"{mean(data)=:.2f}+-{stderr(data):.2f}" f"{stdev(data)=:.2f}" f"{Counter(data)}",
-                sep=", ",
-            )
-        print()
-
-    def _print_lists(name, datas):
-        for mode, data in zip(("(train)", "  (dev)", " (test)", "  (all)"), datas):
-            print(
-                f"{name} {mode} : {max(data)=}"
-                f"{min(data)=}"
-                f"{mean(data)=:.2f}+-{stderr(data):.2f}"
-                f"{sorted(data, reverse=True)[:200]}",
-                sep=", ",
-            )
-        print()
-
-    def _print_values(name, values):
-        for mode, value in zip(("(train)", "  (dev)", " (test)", "  (all)"), values):
-            print(f"{name} {mode} : {value}")
-        print()
-
-    def _n_thoughts(data):
-        ns = [[] for _ in range(max(len(d["label_thoughts"]) for d in data))]
-        for d in data:
-            for i, es in enumerate(d["label_thoughts"]):
-                ns[i].append(len(es))
-        return "\n " + "\n ".join(
-            f"{i:>2}: {len(n)=:5}"
-            + (f", {max(n)=:5}, {min(n)=:2}, {mean(n)=:3.2f}+-{stderr(data):.2f}" if len(n) > 1 else f", {n=}")
-            for i, n in enumerate(ns)
-            if len(n) > 0
-        )
-
-    datamodule = DataModule(tokenizer, datasets, batch_size=1, collate_raw=True, test_on_validation=False)
-
-    trd = datamodule.train_dataloader()
-    vd = datamodule.val_dataloader()
-    tsd = datamodule.test_dataloader()
-    trd = [{k: v[0] for k, v in d.items()} for d in trd]
-    vd = [{k: v[0] for k, v in d.items()} for d in vd]
-    tsd = [{k: v[0] for k, v in d.items()} for d in tsd]
-    ad = (trd + vd) if len(vd) == len(tsd) else (trd + vd + tsd)
-    _print_values("n_equation", (len(Counter(d["equation"] for d in data)) for data in (trd, vd, tsd, ad)))
-    _print_statistics(
-        "n_operations",
-        (
-            [sum(d["equation"].replace("**", "^").count(op) for op in ["+", "-", "*", "/", "^"]) for d in data]
-            for data in (trd, vd, tsd, ad)
-        ),
-    )
-    _print_statistics("target depth", ([len(d["label_thoughts"]) for d in data] for data in (trd, vd, tsd, ad)))
-    _print_values("n_thoughts per depth", (_n_thoughts(data) for data in (trd, vd, tsd)))
-    _print_lists("last depth n_thoughts", ([len(d["label_thoughts"][-1]) for d in data] for data in (trd, vd, tsd, ad)))
-    _print_lists("n_dds", ([d["n_dds"] for d in data] for data in (trd, vd, tsd, ad)))
-    _print_lists("n_thoughts", ([d["n_thoughts"] for d in data] for data in (trd, vd, tsd, ad)))
-    _print_values(
-        "max(n_thoughts per depth)",
-        (
-            max(max(len(e) for e in d["label_thoughts"]) for d in data if len(d["label_thoughts"]) > 0)
-            for data in (trd, vd, tsd)
-        ),
     )
 
 
-def download(language_model="roberta-base", num_token=None):
+def download(language_model="roberta-base"):
     print(f"download() : {language_model=}")
     from transformers import AutoModel, AutoTokenizer, BertTokenizer
-    from tokenizers import AddedToken
 
     try:
         tokenizer = AutoTokenizer.from_pretrained(language_model)
@@ -359,15 +303,6 @@ def download(language_model="roberta-base", num_token=None):
         tokenizer = BertTokenizer.from_pretrained(language_model)
 
     plm = AutoModel.from_pretrained(language_model)
-    if num_token is not None:
-        tokenizer.add_special_tokens(
-            {
-                "additional_special_tokens": [
-                    AddedToken(num_token, single_word=False, lstrip=True, rstrip=False, normalized=False)
-                ]
-            }
-        )
-        plm.resize_token_embeddings(plm.config.vocab_size + 1)
 
     language_model = language_model.split("/")[-1].lower()
     path = f".language-models/{language_model}"

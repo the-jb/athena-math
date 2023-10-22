@@ -1,9 +1,9 @@
-from typing import Optional, Any
-
-import yaml
 import os
 import platform
+from typing import Any, Optional
+
 import pytorch_lightning as pl
+import yaml
 from pytorch_lightning.utilities.types import STEP_OUTPUT
 
 try:
@@ -175,12 +175,23 @@ class ValidateTestCallback(ValidateTestMixin, pl.callbacks.Callback):
         super()._on_validation_epoch_start()
 
     def on_validation_batch_start(
-        self, trainer: pl.Trainer, pl_module: pl.LightningModule, batch, batch_idx, dataloader_idx=0
+        self,
+        trainer: pl.Trainer,
+        pl_module: pl.LightningModule,
+        batch,
+        batch_idx,
+        dataloader_idx=0,
     ):
         super()._on_validation_batch_start(batch, batch_idx, dataloader_idx)
 
     def on_validation_batch_end(
-        self, trainer: pl.Trainer, pl_module: pl.LightningModule, outputs, batch, batch_idx, dataloader_idx=0
+        self,
+        trainer: pl.Trainer,
+        pl_module: pl.LightningModule,
+        outputs,
+        batch,
+        batch_idx,
+        dataloader_idx=0,
     ):
         super()._on_validation_batch_end(outputs, batch, batch_idx, dataloader_idx)
 
@@ -208,7 +219,9 @@ class ValidateTestCallback(ValidateTestMixin, pl.callbacks.Callback):
 class BestScoreSummary(ValidateTestCallback):
     DEFAULT_FILENAME = "result"
 
-    def __init__(self, filename, val_keys, test_keys, node=None, save_dir="results", force_filename=False):
+    def __init__(
+        self, filename, val_keys, test_keys, node=None, save_dir="results", force_filename=False
+    ):
         super().__init__()
         print(f"Summary : {filename=} {val_keys=} {test_keys=} {node=}")
         self.val_keys = [val_keys] if isinstance(val_keys, str) else val_keys
@@ -239,7 +252,9 @@ class BestScoreSummary(ValidateTestCallback):
         self._path = os.path.join(save_dir, self._format_file(filename))
 
     def on_update_best_validation_score(self):
-        self.update_result(f"{self.best_val_score} (epoch={self.current_epoch})", keys=self.val_keys)
+        self.update_result(
+            f"{self.best_val_score} (epoch={self.current_epoch})", keys=self.val_keys
+        )
 
     def on_real_test_epoch_end(self):
         self.update_result(f"{self.test_score} (epoch={self.current_epoch})", keys=self.test_keys)
@@ -310,7 +325,10 @@ class LogEvaluation(ValidateTestCallback):
                 open(path, "x").close()
                 break
             except FileExistsError:
-                path = os.path.join(save_dir, self._format_file(f"{filename}.{(version_cnt := version_cnt + 1):02d}"))
+                path = os.path.join(
+                    save_dir,
+                    self._format_file(f"{filename}.{(version_cnt := version_cnt + 1):02d}"),
+                )
 
         return path
 
@@ -319,7 +337,8 @@ class LogEvaluation(ValidateTestCallback):
 
     def on_update_best_validation_score(self):
         self.write_outputs(
-            self.valid_path, f"Epoch:{self.current_epoch} val_score:{self.best_val_score} {self.train_setting}"
+            self.valid_path,
+            f"Epoch:{self.current_epoch} val_score:{self.best_val_score} {self.train_setting}",
         )
 
     def on_real_validation_batch_end(self, outputs, batch, batch_idx: int):

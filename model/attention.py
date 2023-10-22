@@ -5,9 +5,9 @@ import torch.nn as nn
 class AttentionLayer(nn.Module):
     def __init__(self, hidden_size, n_heads, ff_size, p_drop, ln_type):
         super().__init__()
-        if ln_type == 'pre':
+        if ln_type == "pre":
             self.attention = PreAttention(hidden_size, n_heads, p_drop)
-        elif ln_type == 'post':
+        elif ln_type == "post":
             self.attention = PostAttention(hidden_size, n_heads, p_drop)
         self.ffn = FeedForwardNorm(hidden_size, ff_size, p_drop, ln_type)
 
@@ -23,10 +23,7 @@ class BaseAttention(nn.Module):
         self.attention = MultiHeadAttention(hidden_size, n_heads)
         self.norm = nn.LayerNorm(hidden_size)
         self.ref_norm = nn.LayerNorm(hidden_size)
-        self.dense = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
-            nn.Dropout(p_drop)
-        )
+        self.dense = nn.Sequential(nn.Linear(hidden_size, hidden_size), nn.Dropout(p_drop))
 
 
 class PreAttention(BaseAttention):
@@ -59,14 +56,14 @@ class FeedForwardNorm(nn.Module):
             nn.Linear(hidden_size, ff_size),
             nn.GELU(),
             nn.Linear(ff_size, hidden_size),
-            nn.Dropout(p_drop)
+            nn.Dropout(p_drop),
         )
         self.ln_type = ln_type
 
     def forward(self, inputs):
-        if self.ln_type == 'pre':
+        if self.ln_type == "pre":
             return inputs + self.ff(self.norm(inputs))
-        elif self.ln_type == 'post':
+        elif self.ln_type == "post":
             return self.norm(inputs + self.ff(inputs))
 
 
@@ -82,7 +79,7 @@ class MultiHeadAttention(nn.Module):
         self.n_heads = n_heads
 
         self.head_size = hidden_size // n_heads
-        self.scale_factor = self.head_size ** -0.5
+        self.scale_factor = self.head_size**-0.5
 
     def forward(self, q, k, v, mask):
         q = self.q(q).view(*q.shape[:2], self.n_heads, self.head_size).permute(0, 2, 1, 3)

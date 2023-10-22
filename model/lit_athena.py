@@ -3,7 +3,8 @@ import torch.optim
 from transformers import AutoModel, PreTrainedModel
 
 from callbacks import ValidateTestHook
-from models.athena import Athena
+
+from .athena import Athena
 
 
 class LitAthena(ValidateTestHook, pl.LightningModule):
@@ -31,16 +32,13 @@ class LitAthena(ValidateTestHook, pl.LightningModule):
         epoch,
         start_validation_loss,
         constants,
-        has_power,
-        data_path,
-        dataset,
-        batch_size,
-        collate_raw,
     ):
         super().__init__()
         self.save_hyperparameters()
 
-        self.language_model: PreTrainedModel = AutoModel.from_pretrained(f".language-models/{language_model}")
+        self.language_model: PreTrainedModel = AutoModel.from_pretrained(
+            f".language-models/{language_model}"
+        )
         lm_hidden_size = self.language_model.config.hidden_size
         if n_heads is None:
             n_heads = self.language_model.config.num_attention_heads
@@ -86,7 +84,9 @@ class LitAthena(ValidateTestHook, pl.LightningModule):
 
         optimizer = torch.optim.AdamW(params, lr=self.lr, weight_decay=self.weight_decay)
         if self.lr_scheduler == "step":
-            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, self.lr_step_size, self.lr_factor)
+            scheduler = torch.optim.lr_scheduler.StepLR(
+                optimizer, self.lr_step_size, self.lr_factor
+            )
         else:
             scheduler = torch.optim.lr_scheduler.LinearLR(
                 optimizer, start_factor=1, end_factor=self.lr_factor, total_iters=self.target_epoch
@@ -94,7 +94,9 @@ class LitAthena(ValidateTestHook, pl.LightningModule):
         return [optimizer], [scheduler]
 
     def forward(self, batch):
-        x = self.language_model(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])[0]
+        x = self.language_model(
+            input_ids=batch["input_ids"], attention_mask=batch["attention_mask"]
+        )[0]
 
         x = self.athena(batch, x, self.threshold)
         return x
@@ -110,7 +112,10 @@ class LitAthena(ValidateTestHook, pl.LightningModule):
         return abs(result - answer) < 10**-n_float
 
     def measure(self, predictions, batch):
-        corrects = [self.measure_answer(prediction, answer) for prediction, answer in zip(predictions, batch["answer"])]
+        corrects = [
+            self.measure_answer(prediction, answer)
+            for prediction, answer in zip(predictions, batch["answer"])
+        ]
         return corrects
 
     def training_step(self, batch, batch_idx):
@@ -129,7 +134,9 @@ class LitAthena(ValidateTestHook, pl.LightningModule):
 
     def on_validation_start(self):
         if "train_loss" in self.trainer.callback_metrics:
-            self._skip_validation = 0 < self.start_validation_loss < self.trainer.callback_metrics["train_loss"]
+            self._skip_validation = (
+                0 < self.start_validation_loss < self.trainer.callback_metrics["train_loss"]
+            )
         else:
             self._skip_validation = self.start_validation_loss > 0
 
@@ -143,9 +150,17 @@ class LitAthena(ValidateTestHook, pl.LightningModule):
         batch_size = len(predictions)
 
         prefix = "val" if dataloader_idx == 0 else "test"
-        self.log(f"{prefix}/accuracy", accuracy, prog_bar=True, add_dataloader_idx=False, batch_size=batch_size)
+        self.log(
+            f"{prefix}/accuracy",
+            accuracy,
+            prog_bar=True,
+            add_dataloader_idx=False,
+            batch_size=batch_size,
+        )
         if attn_score is not None:
-            predictions = [LitAthena._ScoreObject(pred, score) for pred, score in zip(predictions, attn_score)]
+            predictions = [
+                LitAthena._ScoreObject(pred, score) for pred, score in zip(predictions, attn_score)
+            ]
         return predictions, corrects
 
     def on_real_validation_epoch_end(self):

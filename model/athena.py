@@ -1,8 +1,16 @@
+import itertools
+
 import torch
 import torch.nn as nn
-from models.attention import AttentionLayer, FeedForwardNorm
-from thought_object import *
-import itertools
+
+from .attention import AttentionLayer, FeedForwardNorm
+from .thought_expander import (
+    AggregateObject,
+    ConstObject,
+    NumberObject,
+    ThoughtExpander,
+    TransformObject,
+)
 
 
 class Athena(nn.Module):
@@ -30,7 +38,9 @@ class Athena(nn.Module):
             hidden_size = lm_hidden_size
         else:
             self.scale = nn.Sequential(
-                nn.Linear(lm_hidden_size, hidden_size), nn.GELU(), nn.LayerNorm(hidden_size, eps=1e-5)
+                nn.Linear(lm_hidden_size, hidden_size),
+                nn.GELU(),
+                nn.LayerNorm(hidden_size, eps=1e-5),
             )
             n_heads = hidden_size * n_heads // lm_hidden_size
         if ff_size < hidden_size:
@@ -38,7 +48,9 @@ class Athena(nn.Module):
 
         self.constants = constants
         if constants:
-            self.const_features = nn.Parameter(torch.randn(len(constants), hidden_size), requires_grad=True)
+            self.const_features = nn.Parameter(
+                torch.randn(len(constants), hidden_size), requires_grad=True
+            )
             self.act_const = nn.Sequential(
                 nn.LayerNorm(hidden_size, eps=1e-5),
                 nn.Linear(hidden_size, ff_size),
@@ -71,10 +83,14 @@ class Athena(nn.Module):
                 question_indices = batch["question_indices"][batch_idx]
                 goal_feature = features[batch_idx, question_indices]
 
-            initial_indices = [num_indices[e.idx] for e in initial_thoughts if isinstance(e, NumberObject)]
+            initial_indices = [
+                num_indices[e.idx] for e in initial_thoughts if isinstance(e, NumberObject)
+            ]
             initial_embedding = features[batch_idx, initial_indices]
             if self.constants:
-                const_indices = [self.constants.index(e) for e in initial_thoughts if isinstance(e, ConstObject)]
+                const_indices = [
+                    self.constants.index(e) for e in initial_thoughts if isinstance(e, ConstObject)
+                ]
                 const_features = self.act_const(self.const_features)
                 initial_embedding = torch.cat((initial_embedding, const_features[const_indices]))
 
@@ -89,7 +105,9 @@ class Athena(nn.Module):
                 )
                 batch_reasoning_loss += reasoning_loss
 
-                final_output, final_loss = self.answer(embeddings, goal_feature, label=batch["label_final"][batch_idx])
+                final_output, final_loss = self.answer(
+                    embeddings, goal_feature, label=batch["label_final"][batch_idx]
+                )
                 batch_final_loss += final_loss
             else:
                 embeddings, thoughts, reasoning_outputs = self.predict_thoughts(
@@ -112,7 +130,13 @@ class Athena(nn.Module):
         return batch_final_thought, batch_scores
 
     def supervise_thoughts(
-        self, initial_embeddings, reasoning_feature, label_thoughts, label_thought_indices, label_dds, label_dd_indices
+        self,
+        initial_embeddings,
+        reasoning_feature,
+        label_thoughts,
+        label_thought_indices,
+        label_dds,
+        label_dd_indices,
     ):
         total_loss = 0
         collected_thoughts = []
@@ -123,16 +147,24 @@ class Athena(nn.Module):
         for depth, (thoughts, thought_indices, label_dd, dd_indices) in enumerate(
             zip(label_thoughts, label_thought_indices, label_dds, label_dd_indices)
         ):
-            expanded_embeddings = initial_embeddings if depth == 0 else self.embed_thought(embeddings, thought_indices)
+            expanded_embeddings = (
+                initial_embeddings
+                if depth == 0
+                else self.embed_thought(embeddings, thought_indices)
+            )
 
-            thought_context, output, loss = self.reason(expanded_embeddings, reasoning_feature, label=label_dd)
+            thought_context, output, loss = self.reason(
+                expanded_embeddings, reasoning_feature, label=label_dd
+            )
 
             if len(dd_indices) > 0:
                 outputs.append(output[dd_indices])
                 expanded_embeddings = expanded_embeddings[dd_indices]
                 thought_context = thought_context[dd_indices]
                 embeddings = (
-                    expanded_embeddings if embeddings is None else torch.cat((embeddings, expanded_embeddings), dim=0)
+                    expanded_embeddings
+                    if embeddings is None
+                    else torch.cat((embeddings, expanded_embeddings), dim=0)
                 )
                 collected_thoughts += [thoughts[i] for i in dd_indices]
                 if self.chain == 1:
@@ -144,14 +176,18 @@ class Athena(nn.Module):
         outputs = torch.cat(outputs)
         return embeddings, collected_thoughts, outputs, total_loss
 
-    def predict_thoughts(self, initial_embeddings, initial_thoughts, reasoning_feature, goal_feature, threshold):
+    def predict_thoughts(
+        self, initial_embeddings, initial_thoughts, reasoning_feature, goal_feature, threshold
+    ):
         outputs = []
         embeddings = None
         expander = ThoughtExpander(initial_thoughts, self.max_depth)
 
         for expanded_thoughts, expanded_indices in expander:
             expanded_embeddings = (
-                initial_embeddings if expanded_indices is None else self.embed_thought(embeddings, expanded_indices)
+                initial_embeddings
+                if expanded_indices is None
+                else self.embed_thought(embeddings, expanded_indices)
             )
 
             thought_context, output = self.reason(expanded_embeddings, reasoning_feature)
@@ -171,9 +207,13 @@ class Athena(nn.Module):
                 expanded_embeddings = expanded_embeddings[accepted_thoughts]
                 thought_context = thought_context[accepted_thoughts]
                 embeddings = (
-                    expanded_embeddings if embeddings is None else torch.cat((embeddings, expanded_embeddings), dim=0)
+                    expanded_embeddings
+                    if embeddings is None
+                    else torch.cat((embeddings, expanded_embeddings), dim=0)
                 )
-                expander.collect([thought for thought, s in zip(expanded_thoughts, accepted_thoughts) if s])
+                expander.collect(
+                    [thought for thought, s in zip(expanded_thoughts, accepted_thoughts) if s]
+                )
                 if self.chain == 1:
                     reasoning_feature = torch.cat((reasoning_feature, thought_context))
                 elif self.chain == 2:
@@ -192,7 +232,10 @@ class EmbedThought(nn.Module):
         super().__init__()
         self.embed = nn.ModuleDict(
             {op: Transform(hidden_size, ff_size, p_drop, ln) for op in TransformObject.OPS}
-            | {op: Aggregate(hidden_size, n_heads, ff_size, p_drop, ln) for op in AggregateObject.OPS}
+            | {
+                op: Aggregate(hidden_size, n_heads, ff_size, p_drop, ln)
+                for op in AggregateObject.OPS
+            }
         )
 
     def forward(self, embeddings, indices):
@@ -308,18 +351,3 @@ class Aggregate(nn.Module):
 
         x = self.ffn(x)
         return x
-
-
-class OrderedAggr(Aggregate):
-    def __init__(self, hidden_size, n_heads, ff_size, p_drop, ln):
-        super().__init__(hidden_size, n_heads, ff_size, p_drop, ln)
-        self.transform = FeedForwardNorm(hidden_size, ff_size, p_drop, ln)
-
-    def apply_qkv(self, embeddings, indices):
-        t = self.transform(embeddings)
-        e = torch.stack((embeddings, t), dim=1)
-
-        q = self.q(embeddings).view(-1, self.n_heads, self.head_size).permute(1, 0, 2)
-        k = self.k(t).view(-1, self.n_heads, self.head_size).permute(1, 2, 0)
-        v = self.v(e).view(-1, 2, self.n_heads, self.head_size).permute(2, 0, 1, 3)[:, indices, (0, 1)]
-        return q, k, v
