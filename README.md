@@ -1,6 +1,6 @@
-# ATHENA
+# ATHENA for Mathematical Reasoning
 
-**ATHENA** (**A**ttention-based **TH**ought **E**xpansion **N**etwork **A**rchitecture) is a neural architecture of thought expansion that yields reasonable thoughts for mathematical reasoning.
+**ATHENA** (**A**ttention-based **TH**ought **E**xpansion **N**etwork **A**rchitecture) is a neural architecture of thought expansion for mathematical reasoning.
 
 Link to our [paper]()
 
@@ -28,19 +28,25 @@ Our repository includes with following datasets:
 - [MathQA](https://aclanthology.org/N19-1245/)
 
 
-## Run Models
-### Setting Environments
+## Run Model
+### Install Environments
 - Python : 3.9
 - Requirements
 ```
 pip install -r requirements.txt
 ```
 
-### Dataset
-
-- Default dataset folder : `data`
+### Pre-download Language Models
+We recommend to prepare language models before training.
+```
+python main.py download --language-model=roberta-base
+```
 
 ### Training
+We offer various options for training.
+List of arguments can be found in [`train()` in `main.py`](https://github.com/the-jb/athena-math/blob/main/main.py#L32).
+
+The following shows few examples:
 
 - Training dataset
 ```
@@ -56,16 +62,16 @@ python main.py train --dataset=asdiv-a --seed=100
 ```
 python main.py train --gpu=0 --dataset=asdiv-a
 ```
-> Note that our model architecture cannot support distributed training with multiple GPUs.
+> The code does support distributed training with multiple GPUs.
 
-- Other arguments for models can be found in `train()` in `main.py`
+### Default path
 
-### Result files
-
-- Default log_path : `logs`
-- Default checkpoint path : `ckpts`
-- Default result path (saving best score record) : `results`
-- Default output path: `outputs`
+- Dataset : `data`
+- Logs : `logs`
+- Checkpoints : `ckpts`
+- Results (for the best score record) : `results`
+- Outputs (for the prediction outputs): `outputs`
+- Language Models : `.language-models`
 
 ### Test models
 
@@ -75,15 +81,14 @@ python main.py test --model-path="ckpts/<ckpt_path>/<ckpt_filename>.ckpt" \
                     --dataset=svamp
 ```
 
-### Other features
+### Inspect Dataset
 
-- Inspect dataset
 ```
 python main.py inspect-data --dataset=cv_asdiv-a/fold0
 ```
 
 # Citation
-
+> To be updated
 ```
 
 ```
