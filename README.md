@@ -2,7 +2,7 @@
 
 **ATHENA** (**A**ttention-based **TH**ought **E**xpansion **N**etwork **A**rchitecture) is a neural architecture of thought expansion for mathematical reasoning.
 
-Link to our [Conference paper](https://aclanthology.org/2023.emnlp-main.1014/) [arXiv version](https://arxiv.org/abs/2311.01036)
+Link to our [[paper]](https://aclanthology.org/2023.emnlp-main.1014/) [[arXiv version]](https://arxiv.org/abs/2311.01036)
 
 <p align=center>
 <img src="figures/athena_fig1.png" style="width: 50%; height: 50%;" />
@@ -104,6 +104,5 @@ python main.py inspect-data --dataset=cv_asdiv-a/fold0
     publisher = "Association for Computational Linguistics",
     url = "https://aclanthology.org/2023.emnlp-main.1014",
     pages = "16315--16327",
-
 }
 ```
