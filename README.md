@@ -2,7 +2,7 @@
 
 **ATHENA** (**A**ttention-based **TH**ought **E**xpansion **N**etwork **A**rchitecture) is a neural architecture of thought expansion for mathematical reasoning.
 
-Link to our [paper](https://arxiv.org/abs/2311.01036)
+Link to our [Conference paper](https://aclanthology.org/2023.emnlp-main.1014/) [arXiv version](https://arxiv.org/abs/2311.01036)
 
 <p align=center>
 <img src="figures/athena_fig1.png" style="width: 50%; height: 50%;" />
@@ -19,34 +19,33 @@ Link to our [paper](https://arxiv.org/abs/2311.01036)
 
 ## Datasets
 
-Our repository includes with following datasets:
+Our repository includes the following datasets:
 
 - [MAWPS](https://aclanthology.org/N16-1136)
 - [ASDiv](https://aclanthology.org/2020.acl-main.92)
 - [SVAMP](https://aclanthology.org/2021.naacl-main.168)
 - [Math23k](https://aclanthology.org/D17-1088/)  
-- [MathQA](https://aclanthology.org/N19-1245/)
 
 
 ## Run Model
 ### Install Environments
-- Python : 3.9
+- Python: 3.9
 - Requirements
 ```
 pip install -r requirements.txt
 ```
 
 ### Pre-download Language Models
-We recommend to prepare language models before training.
+We recommend preparing language models before training.
 ```
 python main.py download --language-model=roberta-base
 ```
 
 ### Training
 We offer various options for training.
-List of arguments can be found in [`train()` in `main.py`](https://github.com/the-jb/athena-math/blob/main/main.py#L32).
+The list of arguments can be found in [`train()`](https://github.com/the-jb/athena-math/blob/main/main.py#L32).
 
-The following shows few examples:
+The following shows a few examples:
 
 - Training dataset
 ```
@@ -66,12 +65,12 @@ python main.py train --gpu=0 --dataset=asdiv-a
 
 ### Default path
 
-- Dataset : `data`
-- Logs : `logs`
-- Checkpoints : `ckpts`
-- Results (for the best score record) : `results`
+- Dataset: `data`
+- Logs: `logs`
+- Checkpoints: `ckpts`
+- Results (for the best score record): `results`
 - Outputs (for the prediction outputs): `outputs`
-- Language Models : `.language-models`
+- Language Models: `.language-models`
 
 ### Test models
 
@@ -88,13 +87,23 @@ python main.py inspect-data --dataset=cv_asdiv-a/fold0
 ```
 
 # Citation
-> To be updated
 ```
 @inproceedings{kim-etal-2023-athena,
-    title = "ATHENA: Mathematical Reasoning with Thought Expansion",
-    author={JB. Kim and Hazel Kim and Joonghyuk Hahn and Yo-Sub Han},
+    title = "{ATHENA}: Mathematical Reasoning with Thought Expansion",
+    author = "Kim, JB.  and
+      Kim, Hazel  and
+      Hahn, Joonghyuk  and
+      Han, Yo-Sub",
+    editor = "Bouamor, Houda  and
+      Pino, Juan  and
+      Bali, Kalika",
     booktitle = "Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing",
+    month = dec,
     year = "2023",
-    url = "https://arxiv.org/abs/2311.01036",
+    address = "Singapore",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2023.emnlp-main.1014",
+    pages = "16315--16327",
+
 }
 ```
